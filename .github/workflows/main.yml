@@ -1,35 +1,15 @@
-name: NEET Scraper 3X Speed
-on:
-  schedule:
-    - cron: '*/10 * * * *' # Every 10 minutes
-  workflow_dispatch:
-
-jobs:
-  scrape:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        subject: [Biology, Chemistry, Physics] # Runs 3 servers at once
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup JQ
-        run: sudo apt-get install jq -y
-
-      - name: Run Scraper for ${{ matrix.subject }}
-        run: |
-          chmod +x scrape.sh
-          ./scrape.sh ${{ matrix.subject }}
-
-      - name: Commit Progress
+      - name: Commit and Push
         run: |
           git config --global user.name "ScraperBot"
           git config --global user.email "bot@trackprep.sync"
+          
+          # 1. Stage changes first
           git add data/
-          # Pull before push to avoid conflicts between 3 servers
+          
+          # 2. Fetch and Rebase to handle parallel runs from other subjects
+          git fetch origin main
           git pull --rebase origin main
+          
+          # 3. Commit and Push
           git commit -m "Sync ${{ matrix.subject }}: $(date)" || echo "No changes"
-          git push
+          git push origin main
