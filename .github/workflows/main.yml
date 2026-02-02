@@ -1,15 +1,43 @@
-      - name: Commit and Push
+name: NEET Scraper 3X Speed
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Increased to 15 mins for better stability
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # Don't stop other subjects if one fails
+      matrix:
+        subject: [Biology, Chemistry, Physics]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Get full history for cleaner merging
+
+      - name: Setup JQ
+        run: sudo apt-get install jq -y
+
+      - name: Run Scraper for ${{ matrix.subject }}
+        run: |
+          chmod +x scrape.sh
+          ./scrape.sh ${{ matrix.subject }}
+
+      - name: Smart Commit and Push
         run: |
           git config --global user.name "ScraperBot"
           git config --global user.email "bot@trackprep.sync"
           
-          # 1. Stage changes first
+          # Handle potential conflicts from other matrix jobs
           git add data/
-          
-          # 2. Fetch and Rebase to handle parallel runs from other subjects
-          git fetch origin main
+          git stash # Temporarily hide changes
           git pull --rebase origin main
+          git stash pop || echo "No local changes to restore"
           
-          # 3. Commit and Push
-          git commit -m "Sync ${{ matrix.subject }}: $(date)" || echo "No changes"
-          git push origin main
+          git add data/
+          git commit -m "Sync ${{ matrix.subject }}: $(date)" || echo "No changes to commit"
+          git push origin main || (git pull --rebase origin main && git push origin main)
