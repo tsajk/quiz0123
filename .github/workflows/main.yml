@@ -1,0 +1,31 @@
+name: NEET Scraper Bot
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Every 30 minutes to bypass 1440min block
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup JQ
+        run: sudo apt-get install jq -y
+
+      - name: Run Scraper
+        run: |
+          chmod +x scrape.sh
+          ./scrape.sh
+
+      - name: Commit Progress
+        run: |
+          git config --global user.name "ScraperBot"
+          git config --global user.email "bot@trackprep.sync"
+          git add data/
+          git commit -m "Sync: Added questions $(date)" || echo "No changes"
+          git push
