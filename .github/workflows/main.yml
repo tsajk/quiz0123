@@ -1,14 +1,14 @@
 name: NEET Scraper 3X Speed
 on:
   schedule:
-    - cron: '*/15 * * * *' # Increased to 15 mins for better stability
+    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # Don't stop other subjects if one fails
+      fail-fast: false
       matrix:
         subject: [Biology, Chemistry, Physics]
     permissions:
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Get full history for cleaner merging
+          fetch-depth: 0
 
       - name: Setup JQ
         run: sudo apt-get install jq -y
@@ -27,17 +27,24 @@ jobs:
           chmod +x scrape.sh
           ./scrape.sh ${{ matrix.subject }}
 
-      - name: Smart Commit and Push
+      - name: Smart Sync and Push
         run: |
           git config --global user.name "ScraperBot"
           git config --global user.email "bot@trackprep.sync"
           
-          # Handle potential conflicts from other matrix jobs
-          git add data/
-          git stash # Temporarily hide changes
-          git pull --rebase origin main
-          git stash pop || echo "No local changes to restore"
-          
-          git add data/
-          git commit -m "Sync ${{ matrix.subject }}: $(date)" || echo "No changes to commit"
-          git push origin main || (git pull --rebase origin main && git push origin main)
+          # Loop to handle push conflicts between Bio/Phy/Chem jobs
+          for i in {1..5}; do
+            git add data/
+            git stash
+            git pull --rebase origin main
+            git stash pop || echo "No changes to unstash"
+            git add data/
+            git commit -m "Sync ${{ matrix.subject }}: $(date)" || break
+            if git push origin main; then
+              echo "Push successful!"
+              break
+            else
+              echo "Push failed, retrying in 10s..."
+              sleep 10
+            fi
+          done
